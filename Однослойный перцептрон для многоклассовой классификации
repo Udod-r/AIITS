@@ -1,0 +1,53 @@
+import numpy as np
+
+# --- Однослойный перцептрон для многоклассовой классификации ---
+class MultiOutputPerceptron:
+    def __init__(self, input_size, output_size, lr=0.01, epochs=20):
+        self.weights = np.zeros((output_size, input_size))
+        self.bias = np.zeros(output_size)
+        self.lr = lr
+        self.epochs = epochs
+
+    def activation(self, x):
+        # Пороговая функция: 1 если >=0, иначе 0
+        return np.where(x >= 0, 1, 0)
+
+    def predict(self, X):
+        linear_output = np.dot(X, self.weights.T) + self.bias
+        return self.activation(linear_output)
+
+    def train(self, X, Y):
+        for _ in range(self.epochs):
+            for xi, yi in zip(X, Y):
+                pred = self.predict(xi)
+                error = yi - pred
+                self.weights += self.lr * error[:, None] * xi
+                self.bias += self.lr * error
+
+# --- Генерация искусственных данных ---
+# 10x10 пикселей → 100 входов
+input_size = 100
+output_size = 10
+samples = 500  # количество обучающих образцов
+
+# Генерация случайных "цифр" (0 или 1 в каждом пикселе)
+X_train = np.random.randint(0, 2, (samples, input_size))
+
+# Случайные метки 0-9
+y_labels = np.random.randint(0, 10, samples)
+
+# Преобразуем метки в one-hot кодировку
+y_train = np.zeros((samples, output_size))
+for i, label in enumerate(y_labels):
+    y_train[i, label] = 1
+
+# --- Обучение перцептрона ---
+perceptron = MultiOutputPerceptron(input_size=input_size, output_size=output_size, lr=0.1, epochs=10)
+perceptron.train(X_train, y_train)
+
+# --- Проверка результатов на первых 10 образцах ---
+predictions = perceptron.predict(X_train[:10])
+print("Истинные метки (one-hot):")
+print(y_train[:10])
+print("Предсказания перцептрона:")
+print(predictions)
