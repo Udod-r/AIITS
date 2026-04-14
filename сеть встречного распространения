@@ -1,0 +1,114 @@
+import numpy as np
+from sklearn.datasets import load_digits
+from sklearn.model_selection import train_test_split
+from sklearn.preprocessing import MinMaxScaler
+from sklearn.metrics import accuracy_score
+
+# --- ЗАГРУЗКА ДАННЫХ ---
+
+digits = load_digits()
+X = digits.data
+y = digits.target
+
+# нормализация
+scaler = MinMaxScaler(feature_range=(0, 1))
+X = scaler.fit_transform(X)
+
+# приводим к 100 признакам (10x10), дополняя нулями
+def pad_to_100(x):
+    return np.pad(x, (0, 100 - len(x)))
+
+X = np.array([pad_to_100(x) for x in X])
+
+# train/test
+X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2)
+
+
+# ============================================================
+# --- СЕТЬ ВСТРЕЧНОГО РАСПРОСТРАНЕНИЯ (CPN)
+# ============================================================
+
+class CPN:
+    def __init__(self, input_size, kohonen_neurons, output_size, lr=0.1):
+        self.input_size = input_size
+        self.kohonen_neurons = kohonen_neurons
+        self.output_size = output_size
+        self.lr = lr
+
+        # веса
+        self.W_k = np.random.rand(kohonen_neurons, input_size)
+        self.W_o = np.zeros((kohonen_neurons, output_size))
+
+    def winner(self, x):
+        distances = np.linalg.norm(self.W_k - x, axis=1)
+        return np.argmin(distances)
+
+    def train(self, X, y, epochs=10):
+        for _ in range(epochs):
+            for xi, target in zip(X, y):
+                w = self.winner(xi)
+
+                # слой Кохонена
+                self.W_k[w] += self.lr * (xi - self.W_k[w])
+
+                # слой Гроссберга
+                t = np.zeros(self.output_size)
+                t[target] = 1
+                self.W_o[w] += self.lr * (t - self.W_o[w])
+
+    def predict(self, X):
+        preds = []
+        for xi in X:
+            w = self.winner(xi)
+            out = self.W_o[w]
+            preds.append(np.argmax(out))
+        return np.array(preds)
+
+
+# ============================================================
+# --- ОДНОСЛОЙНЫЙ ПЕРЦЕПТРОН
+# ============================================================
+
+class Perceptron:
+    def __init__(self, input_size, output_size, lr=0.01):
+        self.W = np.random.randn(input_size, output_size) * 0.01
+        self.lr = lr
+
+    def train(self, X, y, epochs=10):
+        for _ in range(epochs):
+            for xi, target in zip(X, y):
+                out = np.dot(xi, self.W)
+                pred = np.argmax(out)
+
+                if pred != target:
+                    self.W[:, target] += self.lr * xi
+                    self.W[:, pred] -= self.lr * xi
+
+    def predict(self, X):
+        out = np.dot(X, self.W)
+        return np.argmax(out, axis=1)
+
+
+# ============================================================
+# --- ОБУЧЕНИЕ
+# ============================================================
+
+cpn = CPN(input_size=100, kohonen_neurons=30, output_size=10)
+cpn.train(X_train, y_train)
+
+perc = Perceptron(input_size=100, output_size=10)
+perc.train(X_train, y_train)
+
+
+# ============================================================
+# --- ТЕСТ И СРАВНЕНИЕ
+# ============================================================
+
+cpn_preds = cpn.predict(X_test)
+perc_preds = perc.predict(X_test)
+
+cpn_acc = accuracy_score(y_test, cpn_preds)
+perc_acc = accuracy_score(y_test, perc_preds)
+
+print("CPN accuracy:", cpn_acc)
+print("Perceptron accuracy:", perc_acc)
