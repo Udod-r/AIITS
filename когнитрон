@@ -1,0 +1,105 @@
+import numpy as np
+import matplotlib.pyplot as plt
+
+# ============================================================
+# --- ГЕНЕРАЦИЯ ПРОСТЫХ ОБРАЗОВ (10x10)
+# ============================================================
+
+def create_vertical():
+    img = -np.ones((10, 10))
+    img[:, 4:6] = 1
+    return img.flatten()
+
+def create_horizontal():
+    img = -np.ones((10, 10))
+    img[4:6, :] = 1
+    return img.flatten()
+
+def create_cross():
+    img = -np.ones((10, 10))
+    for i in range(10):
+        img[i, i] = 1
+        img[i, 9 - i] = 1
+    return img.flatten()
+
+def add_noise(x, noise=0.2):
+    x = x.copy()
+    n = int(len(x) * noise)
+    idx = np.random.choice(len(x), n, replace=False)
+    x[idx] *= -1
+    return x
+
+def show(x, title=""):
+    plt.imshow(x.reshape(10,10), cmap='gray')
+    plt.title(title)
+    plt.axis('off')
+    plt.show()
+
+
+# ============================================================
+# --- КОГНИТРОН (упрощённый)
+# ============================================================
+
+class Cognitron:
+    def __init__(self, input_size, neurons, lr=0.1):
+        self.input_size = input_size
+        self.neurons = neurons
+        self.lr = lr
+
+        # веса (нормализованные)
+        self.W = np.random.randn(neurons, input_size)
+        self.normalize()
+
+    def normalize(self):
+        for i in range(self.neurons):
+            norm = np.linalg.norm(self.W[i])
+            if norm > 0:
+                self.W[i] /= norm
+
+    def winner(self, x):
+        activations = self.W @ x
+        return np.argmax(activations)
+
+    def train(self, X, epochs=10):
+        for _ in range(epochs):
+            for x in X:
+                w = self.winner(x)
+
+                # обучение победителя (Hebb-like)
+                self.W[w] += self.lr * x
+                self.normalize()
+
+    def predict(self, x):
+        return self.winner(x)
+
+
+# ============================================================
+# --- ДАННЫЕ
+# ============================================================
+
+patterns = [
+    create_vertical(),
+    create_horizontal(),
+    create_cross()
+]
+
+labels = ["vertical", "horizontal", "cross"]
+
+# обучение
+model = Cognitron(input_size=100, neurons=3)
+model.train(patterns, epochs=20)
+
+# ============================================================
+# --- ТЕСТ
+# ============================================================
+
+for i, pattern in enumerate(patterns):
+    noisy = add_noise(pattern, 0.3)
+    pred = model.predict(noisy)
+
+    show(pattern, f"Оригинал: {labels[i]}")
+    show(noisy, "Зашумленный")
+
+    print(f"Ожидалось: {labels[i]}")
+    print(f"Распознано как: {labels[pred]}")
+    print("-"*40)
