@@ -1,0 +1,173 @@
+import pygame
+import random
+import numpy as np
+
+# =========================
+# НАСТРОЙКИ
+# =========================
+WIDTH, HEIGHT = 800, 600
+FPS = 30
+
+PLANT_COUNT = 80
+HERB_COUNT = 20
+PRED_COUNT = 8
+
+# =========================
+# PYGAME
+# =========================
+pygame.init()
+screen = pygame.display.set_mode((WIDTH, HEIGHT))
+clock = pygame.time.Clock()
+
+# =========================
+# ПЕРЦЕПТРОН
+# =========================
+class Perceptron:
+    def __init__(self, input_size):
+        self.w = np.random.uniform(-1, 1, input_size)
+        self.b = np.random.uniform(-1, 1)
+
+    def forward(self, x):
+        return np.tanh(np.dot(self.w, x) + self.b)
+
+# =========================
+# РАСТЕНИЕ
+# =========================
+class Plant:
+    def __init__(self):
+        self.x = random.randint(0, WIDTH)
+        self.y = random.randint(0, HEIGHT)
+        self.energy = 20
+
+    def draw(self):
+        pygame.draw.circle(screen, (0, 200, 0), (int(self.x), int(self.y)), 3)
+
+# =========================
+# БАЗОВЫЙ АГЕНТ
+# =========================
+class Agent:
+    def __init__(self, x, y):
+        self.x = x
+        self.y = y
+        self.energy = 50
+        self.brain = Perceptron(3)
+
+    def move(self, dx, dy):
+        self.x += dx
+        self.y += dy
+        self.x = max(0, min(WIDTH, self.x))
+        self.y = max(0, min(HEIGHT, self.y))
+
+# =========================
+# ТРАВОЯДНЫЙ
+# =========================
+class Herbivore(Agent):
+    def update(self, plants):
+        if not plants:
+            return
+
+        nearest = min(plants, key=lambda p: (p.x-self.x)**2 + (p.y-self.y)**2)
+
+        dx = nearest.x - self.x
+        dy = nearest.y - self.y
+        dist = np.sqrt(dx**2 + dy**2)
+
+        inp = np.array([dx/100, dy/100, self.energy/100])
+        out = self.brain.forward(inp)
+
+        self.move(out*2, out*2)
+        self.energy -= 0.2  # метаболизм
+
+        # поедание
+        if dist < 10:
+            self.energy += nearest.energy
+            plants.remove(nearest)
+
+    def draw(self):
+        pygame.draw.circle(screen, (0, 0, 255), (int(self.x), int(self.y)), 5)
+
+# =========================
+# ХИЩНИК
+# =========================
+class Predator(Agent):
+    def update(self, herbs):
+        if not herbs:
+            return
+
+        nearest = min(herbs, key=lambda h: (h.x-self.x)**2 + (h.y-self.y)**2)
+
+        dx = nearest.x - self.x
+        dy = nearest.y - self.y
+        dist = np.sqrt(dx**2 + dy**2)
+
+        inp = np.array([dx/100, dy/100, self.energy/100])
+        out = self.brain.forward(inp)
+
+        self.move(out*3, out*3)
+        self.energy -= 0.4  # выше метаболизм
+
+        if dist < 10:
+            self.energy += nearest.energy
+            herbs.remove(nearest)
+
+    def draw(self):
+        pygame.draw.circle(screen, (255, 0, 0), (int(self.x), int(self.y)), 6)
+
+# =========================
+# ИНИЦИАЛИЗАЦИЯ
+# =========================
+plants = [Plant() for _ in range(PLANT_COUNT)]
+herbs = [Herbivore(random.randint(0, WIDTH), random.randint(0, HEIGHT)) for _ in range(HERB_COUNT)]
+preds = [Predator(random.randint(0, WIDTH), random.randint(0, HEIGHT)) for _ in range(PRED_COUNT)]
+
+# =========================
+# ЦИКЛ
+# =========================
+running = True
+while running:
+    screen.fill((30, 30, 30))
+
+    for event in pygame.event.get():
+        if event.type == pygame.QUIT:
+            running = False
+
+    # --- обновление ---
+    for h in herbs[:]:
+        h.update(plants)
+        if h.energy <= 0:
+            herbs.remove(h)
+
+    for p in preds[:]:
+        p.update(herbs)
+        if p.energy <= 0:
+            preds.remove(p)
+
+    # рост растений
+    if random.random() < 0.1:
+        plants.append(Plant())
+
+    # размножение
+    for h in herbs[:]:
+        if h.energy > 80:
+            herbs.append(Herbivore(h.x, h.y))
+            h.energy *= 0.5
+
+    for p in preds[:]:
+        if p.energy > 100:
+            preds.append(Predator(p.x, p.y))
+            p.energy *= 0.5
+
+    # --- отрисовка ---
+    for plant in plants:
+        plant.draw()
+
+    for h in herbs:
+        h.draw()
+
+    for p in preds:
+        p.draw()
+
+    pygame.display.flip()
+    clock.tick(FPS)
+
+pygame.quit()
