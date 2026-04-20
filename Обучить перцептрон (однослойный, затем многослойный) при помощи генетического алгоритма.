@@ -1,0 +1,157 @@
+import numpy as np
+
+# =========================
+# 1. ДАННЫЕ (XOR)
+# =========================
+data = [
+    (np.array([0, 0]), 0),
+    (np.array([0, 1]), 1),
+    (np.array([1, 0]), 1),
+    (np.array([1, 1]), 0)
+]
+
+# =========================
+# 2. АКТИВАЦИЯ
+# =========================
+def sigmoid(x):
+    return 1 / (1 + np.exp(-x))
+
+# =========================
+# 3. МОДЕЛИ
+# =========================
+
+# --- Однослойный ---
+def forward_single(weights, x):
+    w1, w2, b = weights
+    return sigmoid(w1 * x[0] + w2 * x[1] + b)
+
+# --- Многослойный (2-3-1) ---
+def forward_mlp(chromosome, x):
+    # распаковка
+    w1 = chromosome[:6].reshape(2, 3)
+    b1 = chromosome[6:9]
+    w2 = chromosome[9:12]
+    b2 = chromosome[12]
+
+    hidden = sigmoid(np.dot(x, w1) + b1)
+    output = sigmoid(np.dot(hidden, w2) + b2)
+
+    return output
+
+# =========================
+# 4. FITNESS
+# =========================
+def fitness_single(w):
+    error = 0
+    for x, y in data:
+        pred = forward_single(w, x)
+        error += (pred - y) ** 2
+    return -error
+
+def fitness_mlp(w):
+    error = 0
+    for x, y in data:
+        pred = forward_mlp(w, x)
+        error += (pred - y) ** 2
+    return -error
+
+# =========================
+# 5. ГЕНЕТИЧЕСКИЙ АЛГОРИТМ
+# =========================
+POP_SIZE = 100
+GENS = 300
+MUT_RATE = 0.2
+
+def mutate(ind):
+    if np.random.rand() < MUT_RATE:
+        ind += np.random.normal(0, 0.5, size=ind.shape)
+    return ind
+
+def crossover(p1, p2):
+    alpha = np.random.rand()
+    return alpha * p1 + (1 - alpha) * p2
+
+# --- Элитный отбор ---
+def elite_selection(pop, fitness_func):
+    scores = np.array([fitness_func(ind) for ind in pop])
+    idx = np.argsort(scores)[-POP_SIZE // 2:]
+    return pop[idx]
+
+# --- Рулетка ---
+def roulette_selection(pop, fitness_func):
+    scores = np.array([fitness_func(ind) for ind in pop])
+    scores = scores - scores.min() + 1e-6  # чтобы были положительные
+    probs = scores / scores.sum()
+    idx = np.random.choice(len(pop), size=len(pop), p=probs)
+    return pop[idx]
+
+def run_ga(dim, fitness_func, selection_method):
+    pop = np.random.uniform(-1, 1, (POP_SIZE, dim))
+    history = []
+
+    for gen in range(GENS):
+        scores = np.array([fitness_func(ind) for ind in pop])
+        best_score = scores.max()
+        history.append(best_score)
+
+        # выбор метода
+        if selection_method == "elite":
+            selected = elite_selection(pop, fitness_func)
+        else:
+            selected = roulette_selection(pop, fitness_func)
+
+        new_pop = []
+        for _ in range(POP_SIZE):
+            p1, p2 = selected[np.random.randint(len(selected), size=2)]
+            child = crossover(p1, p2)
+            child = mutate(child)
+            new_pop.append(child)
+
+        pop = np.array(new_pop)
+
+    best = pop[np.argmax([fitness_func(ind) for ind in pop])]
+    return best, history
+
+# =========================
+# 6. ЗАПУСК
+# =========================
+
+print("=== Однослойный перцептрон ===")
+best_single, hist_single = run_ga(3, fitness_single, "elite")
+
+for x, y in data:
+    print(x, "->", forward_single(best_single, x), "target:", y)
+
+print("\n=== Многослойный (MLP) ===")
+best_mlp, hist_mlp = run_ga(13, fitness_mlp, "elite")
+
+for x, y in data:
+    print(x, "->", forward_mlp(best_mlp, x), "target:", y)
+
+# =========================
+# 7. СРАВНЕНИЕ ОТБОРА
+# =========================
+
+print("\n=== Сравнение методов отбора (MLP) ===")
+
+_, hist_elite = run_ga(13, fitness_mlp, "elite")
+_, hist_roulette = run_ga(13, fitness_mlp, "roulette")
+
+print("Лучший результат (элитный):", max(hist_elite))
+print("Лучший результат (рулетка):", max(hist_roulette))
+
+# =========================
+# 8. (опционально) ГРАФИК
+# =========================
+try:
+    import matplotlib.pyplot as plt
+
+    plt.plot(hist_elite, label="Elite")
+    plt.plot(hist_roulette, label="Roulette")
+    plt.xlabel("Generation")
+    plt.ylabel("Fitness")
+    plt.legend()
+    plt.title("GA training comparison")
+    plt.show()
+except:
+    print("matplotlib не установлен")
