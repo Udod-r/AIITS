@@ -1,0 +1,130 @@
+import numpy as np
+import random
+import matplotlib.pyplot as plt
+
+# =========================
+# ПАРАМЕТРЫ
+# =========================
+NUM_CITIES = 20
+NUM_ANTS = 30
+ITERATIONS = 100
+
+ALPHA = 1.0   # влияние феромона
+BETA = 5.0    # влияние расстояния
+RHO = 0.5     # испарение
+Q = 100       # количество феромона
+
+# =========================
+# ГЕНЕРАЦИЯ ГОРОДОВ
+# =========================
+np.random.seed(42)
+cities = np.random.rand(NUM_CITIES, 2)
+
+# расстояния
+dist_matrix = np.zeros((NUM_CITIES, NUM_CITIES))
+for i in range(NUM_CITIES):
+    for j in range(NUM_CITIES):
+        dist_matrix[i][j] = np.linalg.norm(cities[i] - cities[j])
+
+# феромоны
+pheromone = np.ones((NUM_CITIES, NUM_CITIES))
+
+
+# =========================
+# ВЫБОР СЛЕДУЮЩЕГО ГОРОДА
+# =========================
+def choose_next(current, unvisited):
+    probs = []
+    for j in unvisited:
+        tau = pheromone[current][j] ** ALPHA
+        eta = (1 / dist_matrix[current][j]) ** BETA
+        probs.append(tau * eta)
+
+    probs = np.array(probs)
+    probs /= probs.sum()
+
+    return np.random.choice(unvisited, p=probs)
+
+
+# =========================
+# ДЛИНА ПУТИ
+# =========================
+def path_length(path):
+    total = 0
+    for i in range(len(path) - 1):
+        total += dist_matrix[path[i]][path[i+1]]
+    total += dist_matrix[path[-1]][path[0]]
+    return total
+
+
+# =========================
+# ОСНОВНОЙ АЛГОРИТМ
+# =========================
+best_path = None
+best_length = float('inf')
+history = []
+
+for iteration in range(ITERATIONS):
+    all_paths = []
+    all_lengths = []
+
+    for ant in range(NUM_ANTS):
+        start = random.randint(0, NUM_CITIES - 1)
+        path = [start]
+
+        unvisited = list(range(NUM_CITIES))
+        unvisited.remove(start)
+
+        current = start
+
+        while unvisited:
+            next_city = choose_next(current, unvisited)
+            path.append(next_city)
+            unvisited.remove(next_city)
+            current = next_city
+
+        length = path_length(path)
+
+        all_paths.append(path)
+        all_lengths.append(length)
+
+        if length < best_length:
+            best_length = length
+            best_path = path
+
+    # --- Испарение ---
+    pheromone *= (1 - RHO)
+
+    # --- Обновление феромона ---
+    for path, length in zip(all_paths, all_lengths):
+        for i in range(len(path) - 1):
+            pheromone[path[i]][path[i+1]] += Q / length
+        pheromone[path[-1]][path[0]] += Q / length
+
+    history.append(best_length)
+
+    print(f"Итерация {iteration+1}, лучший путь: {best_length:.3f}")
+
+# =========================
+# ВИЗУАЛИЗАЦИЯ
+# =========================
+plt.figure(figsize=(10, 4))
+
+# график сходимости
+plt.subplot(1, 2, 1)
+plt.plot(history)
+plt.title("Сходимость")
+plt.xlabel("Итерация")
+plt.ylabel("Длина пути")
+
+# лучший маршрут
+plt.subplot(1, 2, 2)
+path = best_path + [best_path[0]]
+x = cities[path, 0]
+y = cities[path, 1]
+
+plt.plot(x, y, '-o')
+plt.title("Лучший маршрут")
+
+plt.tight_layout()
+plt.show()
