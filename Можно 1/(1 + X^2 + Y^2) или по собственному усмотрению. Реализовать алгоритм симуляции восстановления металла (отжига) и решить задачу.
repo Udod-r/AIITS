@@ -1,0 +1,73 @@
+import numpy as np
+import matplotlib.pyplot as plt
+
+# =========================
+# ФУНКЦИЯ (энергия)
+# =========================
+def energy(x, y):
+    return x**2 + y**2  # минимум в (0,0)
+
+# исходная функция (для контроля)
+def f(x, y):
+    return 1 / (1 + x**2 + y**2)
+
+# =========================
+# ПАРАМЕТРЫ ОТЖИГА
+# =========================
+T = 10.0          # начальная температура
+T_min = 1e-3      # конечная температура
+alpha = 0.98      # охлаждение
+steps_per_T = 100
+
+# начальная точка
+x, y = np.random.uniform(-10, 10, 2)
+
+best_x, best_y = x, y
+best_E = energy(x, y)
+
+history = []
+
+# =========================
+# ОСНОВНОЙ ЦИКЛ
+# =========================
+while T > T_min:
+    for _ in range(steps_per_T):
+        # новое состояние
+        x_new = x + np.random.normal(0, 1)
+        y_new = y + np.random.normal(0, 1)
+
+        E_old = energy(x, y)
+        E_new = energy(x_new, y_new)
+
+        dE = E_new - E_old
+
+        # критерий Метрополиса
+        if dE < 0 or np.random.rand() < np.exp(-dE / T):
+            x, y = x_new, y_new
+            E_old = E_new
+
+        # обновление лучшего
+        if E_new < best_E:
+            best_E = E_new
+            best_x, best_y = x_new, y_new
+
+    history.append(best_E)
+    T *= alpha
+
+# =========================
+# РЕЗУЛЬТАТ
+# =========================
+print("Лучшее решение:")
+print("x =", best_x)
+print("y =", best_y)
+print("f(x,y) =", f(best_x, best_y))
+
+# =========================
+# ГРАФИК СХОДИМОСТИ
+# =========================
+plt.plot(history)
+plt.title("Сходимость (Simulated Annealing)")
+plt.xlabel("Итерации охлаждения")
+plt.ylabel("Энергия")
+plt.grid()
+plt.show()
