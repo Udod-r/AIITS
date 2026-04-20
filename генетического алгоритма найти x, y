@@ -1,0 +1,57 @@
+import numpy as np
+
+POP_SIZE = 100
+GENS = 100
+MUTATION_RATE = 0.1
+
+def fitness(x, y):
+    return 1 / (1 + x**2 + y**2)
+
+# Инициализация
+pop = np.random.uniform(-10, 10, (POP_SIZE, 2))
+
+def mutate(ind):
+    if np.random.rand() < MUTATION_RATE:
+        ind += np.random.normal(0, 0.5, 2)
+    return ind
+
+def crossover(p1, p2):
+    alpha = np.random.rand()
+    return alpha*p1 + (1-alpha)*p2
+
+# ---- ЭЛИТНЫЙ ОТБОР ----
+def elite_selection(pop):
+    scores = np.array([fitness(x,y) for x,y in pop])
+    idx = np.argsort(scores)[-POP_SIZE//2:]
+    return pop[idx]
+
+# ---- РУЛЕТКА ----
+def roulette_selection(pop):
+    scores = np.array([fitness(x,y) for x,y in pop])
+    probs = scores / scores.sum()
+    idx = np.random.choice(len(pop), size=len(pop), p=probs)
+    return pop[idx]
+
+def run(selection_func):
+    pop = np.random.uniform(-10, 10, (POP_SIZE, 2))
+    best = []
+
+    for _ in range(GENS):
+        scores = np.array([fitness(x,y) for x,y in pop])
+        best.append(scores.max())
+
+        selected = selection_func(pop)
+
+        new_pop = []
+        for _ in range(POP_SIZE):
+            p1, p2 = selected[np.random.randint(len(selected), size=2)]
+            child = crossover(p1, p2)
+            child = mutate(child)
+            new_pop.append(child)
+
+        pop = np.array(new_pop)
+
+    return best
+
+elite_res = run(elite_selection)
+roulette_res = run(roulette_selection)
